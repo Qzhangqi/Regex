@@ -19,16 +19,11 @@ public class Regex {
     public static final int STRS    = 853; //字符串起始
     public static final int STRE    = 854; //字符串结尾
     public static final int NOCON   = 855; //否定预查
-    private static int nocon = 1;
 
-
-
-
-    private StateTable stateTable = new StateTable();
-    private HashMap<Integer, Regex> noconGroup = new HashMap<>();
-    private ArrayList<String> groups = new ArrayList<>();
-    private ArrayList<String> Tgroups = new ArrayList<>();
-    private LinkedList<StringBuffer> groupStack = new LinkedList<>();
+    private StateTable stateTable = new StateTable(); //DFA 表
+    private ArrayList<String> groups = new ArrayList<>(); //匹配结果组
+    private ArrayList<String> Tgroups = new ArrayList<>(); //临时匹配结果组
+    private LinkedList<StringBuffer> groupStack = new LinkedList<>(); //匹配结果栈
     private GoodReader reader = null;
 
     public Regex(String regex) throws Exception {
@@ -39,7 +34,12 @@ public class Regex {
         productDFA(nfaGraph.start);
     }
 
-
+    /**
+     * 下面四个函数都是 匹配字符串相关
+     * @param input 待匹配字符串
+     * @return 所有匹配结果
+     * @throws IOException
+     */
     public ArrayList<String> match(String input) throws IOException {
         reader = new GoodReader(input);
         return match2();
@@ -70,7 +70,6 @@ public class Regex {
                 groupStack.clear();
                 reader.reset();
                 reader.read();
-//                System.out.println("false char = " + (char)reader.read());
             }
         }
 
@@ -91,16 +90,16 @@ public class Regex {
             return true;
         }
 
-        /*****************************************/
-
+        //读取字符 加入捕获组
         char ch = (char) reader.read();
-
         for (StringBuffer sb : groupStack)
             sb.append(ch);
 
 
         /*          核心递归           */
         for (State state : stateTable.getStates(ch, currentState)) {
+
+            //捕获结束
             if (state.isCapend
                     && groupStack.size() > 1) {
                 for (StringBuffer sb : groupStack)
@@ -108,6 +107,8 @@ public class Regex {
                 reader.unread();
                 Tgroups.add(String.valueOf(groupStack.pop()));
             }
+
+            //捕获开始
             if (state.isCapstart) {
                 for (StringBuffer sb : groupStack)
                     sb.deleteCharAt(sb.length() - 1);
@@ -115,6 +116,7 @@ public class Regex {
                 reader.unread();
             }
 
+            //匹配字符串头 ^
             if (state.isStrs) {
                 if (!reader.isHead()) {
                     for (StringBuffer sb : groupStack) {
@@ -126,6 +128,7 @@ public class Regex {
                 }
             }
 
+            //匹配字符串尾 $
             if (state.isStre) {
                 if (!reader.isEnd()) {
                     for (StringBuffer sb : groupStack) {
@@ -137,25 +140,6 @@ public class Regex {
                 }
             }
 
-            if (state.isNocon != 0) {
-                Regex regex = noconGroup.get(state.isNocon);
-                reader.mark2(100);
-
-                ArrayList<String> strings = new ArrayList<>();
-
-                if (!(strings = regex.match(reader)).isEmpty()) {
-                    reader.reset2();
-                    for (StringBuffer sb : groupStack) {
-                        if (sb.length() >= 1)
-                            sb.deleteCharAt(sb.length() - 1);
-                    }
-                    reader.unread();
-                    return false;
-                }
-
-                reader.reset2();
-            }
-
             if (match3(state))
                 return true;
 
@@ -164,7 +148,6 @@ public class Regex {
                     groupStack.pop();
             }
         }
-        /*          核心递归           */
 
 
         if (stateTable.getState(currentState).isEnd) {
@@ -181,6 +164,7 @@ public class Regex {
         reader.unread();
         return false;
     }
+
 
     /**
      * 正则转 NFA
@@ -260,11 +244,8 @@ public class Regex {
                         else
                             braceHandler(nfaGraph0, tstr, false);
 
-                    } else {
                     }
 
-                    /**********************************************/
-                    /*                                             */
                     if (nfaGraph == null) {
                         nfaGraph = nfaGraph0;
                     } else {
@@ -303,6 +284,7 @@ public class Regex {
                     break;
                 }
 
+                // 或
                 case '|': {
                     NFAGraph nfaGraph2 = regexToNFA(reader.readUntilEnd());
                     nfaGraph.parallelGraph(nfaGraph2);
@@ -384,7 +366,7 @@ public class Regex {
                     break;
                 }
 
-
+                //正常字符
                 default: {
                     Node start = new Node();
                     Node end = new Node();
@@ -400,14 +382,18 @@ public class Regex {
                 }
             }
         }
-
         return nfaGraph;
     }
 
-    /*
+    /**
      * 处理大括号 {2} {2,} {2,4} 指定次数重复
+     * @param nfaGraph 要重复的图
+     * @param repeatTimes 重复字符串
+     * @param noGreed 是否非贪婪
+     * @return 生成图
+     * @throws Exception 非法字符异常
      */
-    private NFAGraph braceHandler(NFAGraph nfaGraph, String repeatTimes, boolean noGreed) throws Exception {
+    private void braceHandler(NFAGraph nfaGraph, String repeatTimes, boolean noGreed) throws Exception {
 
         int i = 0;
         char nextChar = ' ';
@@ -433,18 +419,48 @@ public class Regex {
                     break;
             }
 
-            nfaGraph.repeatGraph4(Integer.valueOf(minTimes), Integer.valueOf(maxTimes), noGreed);
-
             if (i != repeatTimes.length())
                 throw new Exception("正则编译失败 {}内有非法字符");
 
-            return nfaGraph;
+            nfaGraph.repeatGraph4(Integer.valueOf(minTimes), Integer.valueOf(maxTimes), noGreed);
         } else {
             if (i != repeatTimes.length())
                 throw new Exception("正则编译失败 {}内有非法字符");
 
             nfaGraph.repeatGraph3(Integer.valueOf(minTimes));
-            return nfaGraph;
+        }
+    }
+
+    /**
+     * 下面的三个函数 用于产生 DFA
+     * @param start
+     */
+    private void productDFA(Node start) {
+        State state = new State();
+        state.id.add(start.id);
+        ArrayList<State> states = new ArrayList<>();
+        states.add(state);
+
+        while (!states.isEmpty()) {
+            State state0 = states.remove(0);
+            // 如果纵坐标中已经有了
+            if (stateTable.containOrdinate(state0))
+                continue;
+            addLine(state0);
+            stateTable.add(state0, states);
+        }
+        stateTable.showTable();
+    }
+
+    private void addLine(State state) {
+        stateTable.addOrdinate(state);
+        for (Node node : Node.allNodes) {
+            for (int id : state.id) {
+                if (id == node.getId()) {
+                    Node.unLook();
+                    bfs(node, state);
+                }
+            }
         }
     }
 
@@ -466,25 +482,16 @@ public class Regex {
                             if (i == NOGREED)  node0.isNoGreed  = true;
                             if (i == STRS)     node0.isStrs     = true;
                             if (i == STRE)     node0.isStre     = true;
-                            if (i >= NOCON) {
-                                node0.isNocon = i;
-                            }
 
                             if (node.isNoGreed)  node0.isNoGreed  = true;
                             if (node.isStrs)     node0.isStrs     = true;
                             if (node.isStre)     node0.isStre     = true;
-                            if (node.isNocon >= NOCON)   {
-                                node0.isNocon = node.isNocon;
-                            }
 
                             //向前传递 触底前传
                             if (node0.isEnd) {
                                 state.isEnd = true;
                                 if (node0.isNoGreed) state.Priority  = 1;
                                 if (node0.isStre)    state.isStre    = true;
-                                if (node.isNocon >= NOCON)    {
-                                    state.isNocon = node.isNocon;
-                                }
                             }
                             bfsNodes.add(node0);
                         } else {
@@ -497,36 +504,11 @@ public class Regex {
         }
     }
 
-    private void addLine(State state) {
-        stateTable.addOrdinate(state);
-        for (Node node : Node.allNodes) {
-            for (int id : state.id) {
-                if (id == node.getId()) {
-                    Node.unLook();
-                    bfs(node, state);
-                }
-            }
-        }
-    }
 
-    private void productDFA(Node start) {
-        State state = new State();
-        state.id.add(start.id);
-        ArrayList<State> states = new ArrayList<>();
-        states.add(state);
-
-        while (!states.isEmpty()) {
-            State state0 = states.remove(0);
-            // 如果纵坐标中已经有了
-            if (stateTable.containOrdinate(state0))
-                continue;
-            addLine(state0);
-            stateTable.add(state0, states);
-        }
-        stateTable.showTable();
-    }
-
-
+    /**
+     * 输出 NFA 图
+     * @param snode 图的起始节点
+     */
     public static void showNFA(Node snode) {
         System.out.println("-----------showNFA-----------");
         ArrayList<Node> bfsNodes = new ArrayList<>(); //用于bfs
@@ -585,105 +567,3 @@ public class Regex {
         Node.unLook();
     }
 }
-
-
-//                if (currentState.isCAPHEAD) {
-//                    groupStack.push(new StringBuffer(""));
-//                }
-//
-//                if (currentState.isCAPEND && groupStack.size() > 1) {
-//                    Tgroups.add(String.valueOf(groupStack.pop()));
-//                }
-//
-//                if (currentState.isEnd) match = true;
-
-
-
-// else if (nextChar == '{') {
-//         subRegexHead = i + 1;
-//         for (; i < regex.length(); i++) {
-//        nextChar = regex.charAt(i);
-//        if (nextChar == '}') break;
-//        }
-//        }
-
-
-//    boolean matching = false;
-//    int mark = 0;
-//    State currentState = stateTable.getFirstY();
-//
-//        for (int i = 0; i < input.length(); i++) {
-//        char ch = input.charAt(i);
-//        if (stateTable.getState(ch, currentState) != null) {
-//        matching = true;
-//        currentState = stateTable.getState(ch, currentState);
-//        if (currentState.isEnd) {
-//        sign++;
-//        matching = false;
-//        mark = i;
-//        }
-//        } else if (matching) {
-//        matching = false;
-//        i = mark + 1;
-//        } else {
-//        mark = i;
-//        }
-//        }
-
-//                        if ((char)i == ' ') {
-//                                bfsNodes.add(node0);
-//                                if (node.isNoGreed) node0.isGreed = true;
-//                                if (node.isCapend) node0.isCapend = true;
-//                                if (node0.isEnd) {
-//                                state.isEnd = true;
-//                                if (node0.isGreed) state.priority = 1;
-//                                if (node0.isCapend) state.isCAPHEAD = true;
-//                                }
-//
-//                                } else if (i == CAPHEAD) {
-//                                bfsNodes.add(node0);
-//                                if (node.isGreed) node0.isGreed = true;
-//                                if (node.isCapend) node0.isCapend = true;
-//                                if (node0.isEnd) {
-//                                state.isEnd = true;
-//                                if (node0.isGreed) state.priority = 1;
-//                                if (node0.isCapend) state.isCAPHEAD = true;
-//                                }
-//
-//                                state.isCAPHEAD = true;
-//                                } else if (i == CAPEND) {
-//                                node0.isCapend = true;
-//
-//                                bfsNodes.add(node0);
-//                                if (node.isGreed) node0.isGreed = true;
-//                                if (node.isCapend) node0.isCapend = true;
-//                                if (node0.isEnd) {
-//                                state.isEnd = true;
-//                                if (node0.isGreed) state.priority = 1;
-//                                if (node0.isCapend) state.isCAPHEAD = true;
-//                                }
-//                                } else if (i == NOGREED) {
-//                                node0.isGreed = true;
-//
-//                                bfsNodes.add(node0);
-//                                if (node0.isEnd) {
-//                                state.isEnd = true;
-//                                if (node0.isGreed) state.priority = 1;
-//                                if (node0.isCapend) state.isCAPHEAD = true;
-//                                }
-//                                }
-//                                else {
-//                                if (node.isGreed) node0.isGreed = true;
-//                                stateTable.addState((char)i, state, node0);
-//                                }
-
-/**********************************************/
-/*                 否定预查                   */
-//                else {
-//                    Node start = new Node();
-//                    Node end   = new Node();
-//                    int NOCONnocon = NOCON + (nocon++);
-//                    start.addNextNode(NOCONnocon, end);
-//                    nfaGraph0 = new NFAGraph(start, end);
-//                    noconGroup.put(NOCONnocon, new Regex(regex.substring(subRegexHead, i)));
-//                }

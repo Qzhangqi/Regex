@@ -6,15 +6,15 @@ public class NFAGraph implements Cloneable {
     Node start;
     Node end;
 
-    NFAGraph cloneNFA;
-    HashMap<Node, Node> cloneMap;
+    private NFAGraph cloneNFA; //克隆图时用
+    private HashMap<Node, Node> cloneMap; //克隆图时用
 
     NFAGraph(Node start, Node end) {
         this.start = start;
         this.end   = end;
     }
 
-    NFAGraph() {
+    private NFAGraph() {
         this.start = null;
         this.end   = null;
     }
@@ -90,10 +90,7 @@ public class NFAGraph implements Cloneable {
      * 重复 ? 0 到 1 次
      */
     void repeatGraph1() {
-//        NFAGraph nfaGraph0 = this.clone();
         this.addSToE();
-//        this.end.addNextNode(' ', nfaGraph0.start);
-//        this.end = nfaGraph0.end;
     }
 
     /*

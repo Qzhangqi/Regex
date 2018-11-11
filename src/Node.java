@@ -25,12 +25,20 @@ class Node {
      */
     boolean isEnd   = false;
 
+    /*
+     * 是否非贪婪
+     */
     boolean isNoGreed = false;
-//    boolean isCapend = false;
-//    boolean isCapstart = false;
+
+    /*
+     * 是否只匹配字符串首
+     */
     boolean isStre = false;
+
+    /*
+     * 是否只匹配字符串尾
+     */
     boolean isStrs = false;
-    int isNocon = 0;
 
     /*
      * 节点的 id

@@ -1,7 +1,6 @@
 import java.io.IOException;
-import java.io.Reader;
 
-public class GoodReader extends Reader {
+public class GoodReader {
 
     private String str;
     private int length;
@@ -9,7 +8,7 @@ public class GoodReader extends Reader {
     private int mark = 0;
     private int mark2 = 0;
 
-    public GoodReader(String s) {
+    GoodReader(String s) {
         this.str = s;
         this.length = s.length();
     }
@@ -19,15 +18,17 @@ public class GoodReader extends Reader {
             throw new IOException("Stream closed");
     }
 
-    public int read() throws IOException {
-        synchronized (lock) {
-            ensureOpen();
-            if (next >= length)
-                return -1;
-            return str.charAt(next++);
-        }
+    int read() throws IOException {
+        ensureOpen();
+        if (next >= length)
+            return -1;
+        return str.charAt(next++);
     }
 
+    /*
+     * 读取直到遇到 uch 这个字符
+     * 返回不包含 uch 但 uch 已被读取
+     */
     public String readUntilCh(char uch) throws IOException {
         StringBuffer re = new StringBuffer();
 
@@ -42,15 +43,19 @@ public class GoodReader extends Reader {
         return String.valueOf(re);
     }
 
+    /*
+     * 预读取一个字符
+     */
     public int peek() throws IOException {
-        synchronized (lock) {
-            ensureOpen();
-            if (next>= length)
-                return -1;
-            return str.charAt(next);
-        }
+        ensureOpen();
+        if (next>= length)
+            return -1;
+        return str.charAt(next);
     }
 
+    /*
+     * 读取到结束
+     */
     public String readUntilEnd() throws IOException {
         StringBuffer re = new StringBuffer();
 
@@ -61,6 +66,9 @@ public class GoodReader extends Reader {
         return String.valueOf(re);
     }
 
+    /*
+     * 读取 （） 中内容
+     */
     public String readContentInBracket() throws IOException {
         StringBuffer re = new StringBuffer();
         int bracketnums = 0;      //内层括号数
@@ -84,61 +92,60 @@ public class GoodReader extends Reader {
 
 
     public int read(char cbuf[], int off, int len) throws IOException {
-        synchronized (lock) {
-            ensureOpen();
-            if ((off < 0) || (off > cbuf.length) || (len < 0) ||
-                    ((off + len) > cbuf.length) || ((off + len) < 0)) {
-                throw new IndexOutOfBoundsException();
-            } else if (len == 0) {
-                return 0;
-            }
-            if (next >= length)
-                return -1;
-            int n = Math.min(length - next, len);
-            str.getChars(next, next + n, cbuf, off);
-            next += n;
-            return n;
+        ensureOpen();
+        if ((off < 0) || (off > cbuf.length) || (len < 0) ||
+                ((off + len) > cbuf.length) || ((off + len) < 0)) {
+            throw new IndexOutOfBoundsException();
+        } else if (len == 0) {
+            return 0;
         }
+        if (next >= length)
+            return -1;
+        int n = Math.min(length - next, len);
+        str.getChars(next, next + n, cbuf, off);
+        next += n;
+        return n;
     }
 
+    /*
+     * 当前是否在字符串头
+     */
     public boolean isHead() {
-        if (next == 1)
-            return true;
-        else
-            return false;
+        return next == 1;
     }
 
+    /*
+     * 当前是否在字符串尾
+     */
     public boolean isEnd() {
-        if (next == length)
-            return true;
-        else
-            return false;
+        return next == length;
     }
 
-    public void unread() {
-        next--;
+    /*
+     * 退回一个字符
+     */
+    public void unread() throws IOException {
+        if (next > 0)
+            next--;
+        else
+            throw new IOException("无法退回");
     }
 
     public long skip(long ns) throws IOException {
-        synchronized (lock) {
-            ensureOpen();
-            if (next >= length)
-                return 0;
-            // Bound skip by beginning and end of the source
-            long n = Math.min(length - next, ns);
-            n = Math.max(-next, n);
-            next += n;
-            return n;
-        }
+        ensureOpen();
+        if (next >= length)
+            return 0;
+        long n = Math.min(length - next, ns);
+        n = Math.max(-next, n);
+        next += n;
+        return n;
     }
 
     public boolean ready() throws IOException {
-        synchronized (lock) {
-            if (next >= length)
-                return false;
-            else
-                return true;
-        }
+        if (next >= length)
+            return false;
+        else
+            return true;
     }
 
     public boolean markSupported() {
@@ -149,34 +156,26 @@ public class GoodReader extends Reader {
         if (readAheadLimit < 0){
             throw new IllegalArgumentException("Read-ahead limit < 0");
         }
-        synchronized (lock) {
-            ensureOpen();
-            mark = next;
-        }
+        ensureOpen();
+        mark = next;
     }
 
     public void reset() throws IOException {
-        synchronized (lock) {
-            ensureOpen();
-            next = mark;
-        }
+        ensureOpen();
+        next = mark;
     }
 
     public void mark2(int readAheadLimit) throws IOException {
         if (readAheadLimit < 0){
             throw new IllegalArgumentException("Read-ahead limit < 0");
         }
-        synchronized (lock) {
-            ensureOpen();
-            mark2 = next;
-        }
+        ensureOpen();
+        mark2 = next;
     }
 
     public void reset2() throws IOException {
-        synchronized (lock) {
-            ensureOpen();
-            next = mark2;
-        }
+        ensureOpen();
+        next = mark2;
     }
 
     public void close() {

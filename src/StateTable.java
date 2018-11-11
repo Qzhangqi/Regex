@@ -9,25 +9,20 @@ public class StateTable {
     private int y = 0; //纵坐标
     private int x = 0; //横坐标
 
-    State getState(char x, State y) {
-        return getState((int)x, y);
-    }
 
-    State getState(int ch, State y) {
-
-        Integer ix = chMapx.get(ch);
-        Integer iy = stateMapy.get(y);
-
-        if (ix == null || iy == null)
-            return null;
-
-        return stateTable[ix][iy];
-    }
-
+    /*
+     * 获取一个 唯一 状态
+     */
     State getState(State state) {
         return hashMapState.get(state.hashCode());
     }
 
+    /**
+     * 获取一个状态集 (匹配时用)
+     * @param x 横坐标
+     * @param y 纵坐标
+     * @return 对于状态
+     */
     PriorityQueue<State> getStates(int x, State y) {
         PriorityQueue<State> states = new PriorityQueue<>();
         //先确定纵坐标
@@ -101,7 +96,9 @@ public class StateTable {
         return states;
     }
 
-
+    /*
+     * 获取第一个纵坐标
+     */
     State getFirstY() {
         for (State state : stateMapy.keySet()) {
             if (stateMapy.get(state) == 0)
@@ -111,7 +108,9 @@ public class StateTable {
         return null;
     }
 
-    //添加一个横坐标
+    /*
+     * 添加一个横坐标
+     */
     void addAbscissa(char ch) {
         addAbscissa((int)ch);
     }
@@ -139,6 +138,11 @@ public class StateTable {
         return false;
     }
 
+    /**
+     * 在状态中添加一个 id 如果状态还不存在 就添加一个状态
+     * @param x 横坐标
+     * @param y 纵坐标
+     */
     void addState(char x, State y, Node node0, Node node) {
         int ix = chMapx.get((int)x);
         int iy = stateMapy.get(y);
@@ -154,16 +158,15 @@ public class StateTable {
             stateTable[ix][iy].isEnd = true;
         if (node.isNoGreed)
             stateTable[ix][iy].Priority = 1;
-//        if (node.isCapstart)
-//            stateTable[ix][iy].isCapstart = true;
-//        if (node.isCapend)
-//            stateTable[ix][iy].isCapend = true;
-        if (node.isNocon >= Regex.NOCON)
-            stateTable[ix][iy].isNocon = node.isNocon;
         if (node.isStrs)
             stateTable[ix][iy].isStrs = true;
     }
 
+    /**
+     * 将一行状态 添加入状态队列中
+     * @param state 要添加的那一行的纵坐标
+     * @param states 要添加入的队列
+     */
     void add(State state, ArrayList<State> states) {
         int iy = stateMapy.get(state);
 
@@ -173,6 +176,9 @@ public class StateTable {
         }
     }
 
+    /*
+     * 输出  匹配表
+     */
     void showTable() {
         System.out.println("-----------showTable-----------");
 
